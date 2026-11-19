@@ -3,7 +3,7 @@
    Si apiKey empieza con "PEGA", el panel funciona en MODO DEMO.
    ========================================================= */
 window.FIREBASE_CONFIG = {
-  apiKey: "AIzaSyA_8kzGwf-WdN0HHM1IfC9Ccp2fpmx2fwIs",
+  apiKey: "AIzaSyA_8kzGwf-WdNHHM1IfC9Ccp2fpmx2fwIs",
   authDomain: "polleria-7bac5.firebaseapp.com",
   projectId: "polleria-7bac5",
   storageBucket: "polleria-7bac5.firebasestorage.app",
