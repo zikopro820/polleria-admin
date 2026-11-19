@@ -1,0 +1,35 @@
+POLLERÍA EL POLLÓN — Panel (repositorio: polleria-admin)
+==================================================================
+
+1) FIREBASE (proyecto polleria-7bac5)
+   a. Firestore Database → Crear base de datos → modo producción → región southamerica-east1 (São Paulo).
+   b. Firestore → Reglas → borra todo, pega el archivo firestore.rules → Publicar.
+   c. Authentication → Comenzar → Correo/contraseña → Habilitar.
+      Users → Agregar usuario, uno por cada correo del equipo:
+        admin@elpollon.pe · caja@elpollon.pe · cocina@elpollon.pe · reparto@elpollon.pe
+      (Si usas otros correos, cámbialos en firebase-config.js Y en firestore.rules. Deben ser iguales.)
+   d. Authentication → Configuración → Dominios autorizados → Agregar: zikopro820.github.io
+
+2) GITHUB PAGES
+   Sube estos archivos al repo polleria-admin → Settings → Pages → Deploy from branch → main / root.
+   El panel queda en: https://zikopro820.github.io/polleria-admin/
+
+3) PRIMER INGRESO
+   Entra con admin@elpollon.pe → Ajustes → «Cargar carta de ejemplo».
+   Luego edita en Ajustes: nombre, logo, WhatsApp, dirección, horario, QR de Yape y Plin, repartidores.
+   En «Carta y precios» cambia fotos, precios y opciones. En «Zonas de delivery» pon tus zonas reales.
+
+4) ROLES
+   Administración → todo.
+   Caja → pedidos, venta en local, carta (marcar agotados), caja, abrir/cerrar la tienda.
+   Cocina → tablero de pedidos: «A cocina» y «Listo».
+   Reparto → tablero de pedidos: «Entregado» (y cobrar si paga en efectivo).
+
+5) EN EL DÍA A DÍA
+   - Deja el panel abierto en la caja: suena 3 veces cuando entra un pedido web.
+   - Botón verde/rojo arriba: abre o cierra la tienda online al instante (ej. si se acabó el pollo).
+   - En la carta, el interruptor «Hay hoy» marca un plato como agotado en la web y la app.
+   - Comanda: botón del gorro de chef → PDF de 80 mm para la impresora térmica de cocina.
+
+MODO DEMO: si en firebase-config.js el apiKey empieza con "PEGA", todo funciona sin Firebase
+(datos guardados solo en ese navegador).
