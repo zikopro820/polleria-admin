@@ -95,8 +95,9 @@ VIEWS.inicio = async () => {
 };
 
 /* ================= PEDIDOS (tablero) ================= */
-let PT = "activos", PF_E = "";
+let PT = "activos", PF_E = null;
 VIEWS.pedidos = async (silencioso) => {
+  if (PF_E === null) PF_E = YO().rol === "Reparto" ? "delivery" : "";
   const desde = addD(HOY(), PT === "hist" ? -6 : -1);
   const todos = (await DB.list("pedidos", ["creado", ">=", desde])).sort((a, b) => String(a.creado).localeCompare(b.creado));
   const filtro = p => !PF_E || p.entrega === PF_E;
@@ -118,7 +119,7 @@ VIEWS.pedidos = async (silencioso) => {
   const act = todos.filter(p => ["por-validar", "nuevo", "cocina", "listo", "camino"].includes(p.estado)), hist = todos.filter(p => ["entregado", "anulado", "rechazado"].includes(p.estado)).reverse();
   const html = topBar("Pedidos", "Web, local y delivery en un solo tablero. Suena cuando llega uno nuevo.", `<div class="seg"><button class="${PT === "activos" ? "on" : ""}" data-pt="activos">En curso (${act.length})</button><button class="${PT === "hist" ? "on" : ""}" data-pt="hist">Historial 7 días</button></div>`)
     + `<div class="chips">${[["", "Todos"], ["delivery", "🛵 Delivery"], ["recojo", "🏪 Recojo"], ["local", "🍽️ En local"], ["llevar", "🥡 Para llevar"]].map(([k, t]) => `<button class="chip ${PF_E === k ? "on" : ""}" data-pe="${k}">${t}</button>`).join("")}</div>`
-    + (PT === "activos" ? (act.some(p => p.estado === "por-validar") ? `<div class="alert warn">${ico("alert")} <span>Antes de validar un pago, <b>confirma en tu app de Yape/Plin que el dinero llegó</b>. Una captura se puede editar.</span></div>` : "")
+    + (PT === "activos" ? (act.some(p => p.estado === "por-validar") && !["Reparto", "Cocina"].includes(YO().rol) ? `<div class="alert warn">${ico("alert")} <span>Antes de validar un pago, <b>confirma en tu app de Yape/Plin que el dinero llegó</b>. Una captura se puede editar.</span></div>` : "")
       + `<div class="board">${COLS.map(([t, f]) => { const l = act.filter(f).filter(filtro); return `<section class="col"><h3>${t} <b>${l.length}</b></h3>${l.map(tarjeta).join("") || `<p class="muted sm col-v">—</p>`}</section>`; }).join("")}</div>`
       : `<div class="peds">${hist.filter(filtro).slice(0, 150).map(tarjeta).join("") || vacio("Sin pedidos en los últimos 7 días.")}</div>`);
   if (silencioso && $("#view").dataset.h === html) return; $("#view").innerHTML = html; $("#view").dataset.h = html;
@@ -130,7 +131,8 @@ VIEWS.pedidos = async (silencioso) => {
 };
 function accionesPedido(p) {
   const B = (a, t, c = "btn-light") => `<button class="btn ${c} btn-sm" data-pa="${a}|${esc(p.id)}">${t}</button>`, R = YO().rol;
-  if (R === "Reparto") return p.estado === "camino" ? B("entregar", `${ico("check")} Entregado`, "btn-pri") : "";
+  if (R === "Reparto") return p.entrega !== "delivery" ? "" : p.estado === "listo" ? B("tomar", `${ico("bike")} Llevar este pedido`, "btn-pri")
+    : p.estado === "camino" ? B("entregar", `${ico("check")} Entregado${p.pagado ? "" : " y cobrado"}`, "btn-pri") : "";
   if (R === "Cocina") return { nuevo: B("aceptar", `${ico("fire")} A cocina`, "btn-pri"), cocina: B("listo", `${ico("check")} Listo`, "btn-pri") }[p.estado] || "";
   return { "por-validar": B("validar", `${ico("check")} Ver captura y validar`, "btn-pri") + B("rechazar", "Rechazar"),
     nuevo: B("aceptar", `${ico("fire")} Aceptar y mandar a cocina`, "btn-pri") + B("anular", "Anular"),
@@ -159,6 +161,11 @@ async function accionPedido(a, p) {
       await fin([upd({ estado: "cocina", tiempo: +d.tiempo, aceptado: new Date().toISOString() })], "Pedido en cocina 🔥", d.enviar ? msgCliente(p, `🔥 Tu pedido ya está en cocina. Estará listo en aprox. *${d.tiempo} min*.`) : null); }, "Mandar a cocina");
   if (a === "listo") return fin([upd({ estado: "listo", listo: new Date().toISOString() })], p.entrega === "delivery" ? "Listo · falta despachar" : "Pedido listo",
     p.entrega === "recojo" && YO().rol !== "Cocina" ? msgCliente(p, `🛍️ Tu pedido está *listo para recoger* en ${CAT.aj.direccion || "el local"}.`) : null);
+  if (a === "tomar") return modal(`Llevar · ${p.codigo || id}`, `<p>📍 <b>${esc(p.direccion || "")}</b>${p.referencia ? " · " + esc(p.referencia) : ""}</p>
+      ${p.ubic ? `<p><a class="btn btn-light btn-sm" href="https://maps.google.com/?q=${p.ubic.lat},${p.ubic.lng}" target="_blank" rel="noopener">${ico("map")} Abrir en Google Maps</a></p>` : ""}
+      ${p.pagado ? `<div class="alert ok sm">${ico("check")} <span>Ya está pagado con ${esc(p.pago)}. No cobres nada.</span></div>` : `<div class="alert warn sm">${ico("cash")} <span>Cobrar <b>${S(p.total)}</b>${p.pagaCon ? ` · paga con ${S(p.pagaCon)}, lleva <b>vuelto de ${S(p.pagaCon - p.total)}</b>` : ""}</span></div>`}
+      ${fld("rep", "Tu nombre", repartidores()[0]?.n || "", { req: true, opts: repartidores().length ? repartidores().map(r => r.n) : null })}${fld("enviar", "Avisar al cliente que va en camino (WhatsApp)", true, { type: "checkbox", full: true })}`, async d =>
+    fin([upd({ estado: "camino", repartidor: d.rep, despachado: new Date().toISOString() })], "Pedido en camino 🛵", d.enviar ? msgCliente(p, `🛵 Tu pedido ya *va en camino* con ${d.rep}. ¡Pronto llega!`) : null), "Salgo a entregar");
   if (a === "despachar") { const rs = repartidores();
     return modal(`Despachar · ${p.codigo || id}`, `<div class="g2">${rs.length ? fld("rep", "Repartidor", rs[0].n, { opts: rs.map(r => r.n), full: true }) : fld("rep", "Repartidor", "", { req: true, full: true, help: "Agrega tus repartidores en Ajustes para elegirlos de una lista." })}
       ${fld("enviar", "Avisar al cliente por WhatsApp", true, { type: "checkbox", full: true })}${fld("waRep", "Enviar la dirección al repartidor por WhatsApp", !!rs.length, { type: "checkbox", full: true })}</div>
@@ -245,6 +252,7 @@ VIEWS.carta = async () => {
   await cargarCatalogo();
   const norm = s => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   const l = CAT.prods.filter(p => (!PF.cat || p.cat === PF.cat) && norm(p.nombre).includes(norm(PF.q)));
+  const sinFoto = CAT.prods.filter(p => !p.foto && (window.PL_FOTOS.productos[p.id])).length + CAT.cats.filter(c => !c.foto && window.PL_FOTOS.categorias[c.id]).length;
   $("#view").innerHTML = topBar("Carta y precios", "Lo que cambies aquí se ve al instante en la web y en la app.", esAdm() ? `<button class="btn btn-pri btn-sm" id="np">${ico("plus")} Plato</button>` : "") + `
     <div class="kpis"><div class="kpi"><span>Platos</span><b>${CAT.prods.length}</b><small>${CAT.prods.filter(p => p.activo === false).length} oculto(s)</small></div><div class="kpi"><span>Agotados</span><b class="${CAT.prods.some(p => p.agotado) ? "neg" : ""}">${CAT.prods.filter(p => p.agotado).length}</b><small>se ven pero no se pueden pedir</small></div>
       <div class="kpi"><span>Favoritos</span><b>${CAT.prods.filter(p => p.destacado).length}</b><small>arriba en la web</small></div><div class="kpi"><span>Con opciones</span><b>${CAT.prods.filter(p => (p.opciones || []).length).length}</b><small>parte, papas, término…</small></div></div>
@@ -258,6 +266,7 @@ VIEWS.carta = async () => {
         <td>${esAdm() ? `<button class="btn btn-light btn-sm" data-ep="${esc(p.id)}" aria-label="Editar">${ico("edit")}</button>` : ""}</td></tr>`).join("") || `<tr><td colspan="7" class="muted">Sin platos.</td></tr>`}</tbody></table></div></section>`;
   $("#pq").addEventListener("change", e => { PF.q = e.target.value; VIEWS.carta(); }); $("#pc").addEventListener("change", e => { PF.cat = e.target.value; VIEWS.carta(); });
   $("#np")?.addEventListener("click", () => formPlato());
+  $("#fotosEj")?.addEventListener("click", ponerFotosEjemplo);
   $("#view").onclick = e => { const ep = e.target.closest("[data-ep]"); if (ep) formPlato(prodDe(ep.dataset.ep)); };
   $("#view").onchange = async e => { const t = e.target, p = prodDe(t.dataset.hay || t.dataset.vis || t.dataset.pr); if (!p) return;
     if (t.dataset.hay) { await DB.set("productos", p.id, { agotado: !t.checked }); p.agotado = !t.checked; t.nextElementSibling.nextElementSibling.textContent = t.checked ? "Sí" : "Agotado"; toast(t.checked ? `${p.nombre}: disponible` : `${p.nombre}: agotado en la web`); }
@@ -299,18 +308,30 @@ function formPlato(p) {
     $("#delP")?.addEventListener("click", async () => { if (!confirm(`¿Eliminar «${p.nombre}»?`)) return; await DB.del("productos", p.id); cerrarModal(); toast("Plato eliminado"); VIEWS.carta(); }); } });
 }
 
+// Pone las fotos reales de ejemplo a los platos y categorías que aún no tienen foto (no toca las que ya subiste)
+async function ponerFotosEjemplo() {
+  const F = window.PL_FOTOS, ops = [];
+  CAT.prods.forEach(p => { if (!p.foto && F.productos[p.id]) ops.push({ op: "set", col: "productos", id: p.id, data: { foto: window.PL_FOTO(F.productos[p.id]) } }); });
+  CAT.cats.forEach(c => { if (!c.foto && F.categorias[c.id]) ops.push({ op: "set", col: "categorias", id: c.id, data: { foto: window.PL_FOTO(F.categorias[c.id], 300) } }); });
+  if (!ops.length) return toast("Todos los platos ya tienen foto");
+  await DB.batch(ops); toast(`📷 ${ops.length} fotos puestas · ya se ven en la web`); await cargarCatalogo(); refrescar();
+}
+
 /* ================= CATEGORÍAS ================= */
 VIEWS.categorias = async () => {
   await cargarCatalogo();
   $("#view").innerHTML = topBar("Categorías", "Las pestañas de la carta en la web, en este orden.", `<button class="btn btn-pri btn-sm" id="nc">${ico("plus")} Categoría</button>`) +
-    `<section class="card"><ul class="lst cats">${CAT.cats.map((c, i) => `<li><span class="cat-em">${esc(c.icono || "🍗")}</span><div><b>${esc(c.nombre)}</b><small>${CAT.prods.filter(p => p.cat === c.id).length} plato(s)</small></div>
+    `<section class="card"><ul class="lst cats">${CAT.cats.map((c, i) => `<li>${c.foto ? `<span class="p-th" style="background-image:url('${esc(IMG(c.foto, 160))}')"></span>` : ""}<span class="cat-em">${esc(c.icono || "🍗")}</span><div><b>${esc(c.nombre)}</b><small>${CAT.prods.filter(p => p.cat === c.id).length} plato(s)</small></div>
       <button class="btn btn-light btn-xs" data-up="${i}" ${i ? "" : "disabled"} aria-label="Subir">▲</button><button class="btn btn-light btn-xs" data-dn="${i}" ${i < CAT.cats.length - 1 ? "" : "disabled"} aria-label="Bajar">▼</button><button class="btn btn-light btn-sm" data-ec="${esc(c.id)}">${ico("edit")}</button></li>`).join("") || `<li class="muted">Sin categorías.</li>`}</ul></section>`;
   const form = c => modal(c ? c.nombre : "Nueva categoría", `<div class="g2">${fld("nombre", "Nombre", c?.nombre || "", { req: true, full: true })}
-    <div class="full"><span class="lbl">Ícono</span><div class="em-pick">${EMOJIS.map(k => `<label><input type="radio" name="icono" value="${k}" ${(c?.icono || "🍗") === k ? "checked" : ""}><span>${k}</span></label>`).join("")}</div></div></div>
+    <div class="full"><span class="lbl">Ícono</span><div class="em-pick">${EMOJIS.map(k => `<label><input type="radio" name="icono" value="${k}" ${(c?.icono || "🍗") === k ? "checked" : ""}><span>${k}</span></label>`).join("")}</div></div>
+    <div class="full"><span class="lbl">Foto (sale en las pestañas de la carta)</span><div class="foto-up"><span id="cPrev" style="background-image:url('${esc(IMG(c?.foto, 300))}')"></span><label class="btn btn-light btn-sm">${ico("camera")} Subir foto<input type="file" accept="image/*" id="cFile" hidden></label><button type="button" class="btn btn-light btn-sm" id="cX">Quitar</button><input type="hidden" name="foto" value="${esc(c?.foto || "")}"></div></div></div>
     ${c ? `<button type="button" class="btn btn-light danger btn-sm" id="delC">${ico("trash")} Eliminar categoría</button>` : ""}`, async d => {
     const id = c?.id || d.nombre.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\W+/g, "-").replace(/^-|-$/g, "") || "cat-" + Date.now().toString(36);
     if (!c && CAT.cats.find(x => x.id === id)) { toast("Ya existe esa categoría", true); return false; }
-    await DB.set("categorias", id, { nombre: d.nombre, icono: d.icono || "🍗", orden: c?.orden ?? CAT.cats.length }); toast("Categoría guardada"); VIEWS.categorias(); }, "Guardar", { alAbrir: () => {
+    await DB.set("categorias", id, { nombre: d.nombre, icono: d.icono || "🍗", foto: d.foto || "", orden: c?.orden ?? CAT.cats.length }); toast("Categoría guardada"); VIEWS.categorias(); }, "Guardar", { alAbrir: F => {
+    $("#cFile").onchange = async e => { const f = e.target.files[0]; if (!f) return; const u = await redimensionar(f, 500, .72); $("[name=foto]", F).value = u; $("#cPrev").style.backgroundImage = `url('${u}')`; };
+    $("#cX").onclick = () => { $("[name=foto]", F).value = ""; $("#cPrev").style.backgroundImage = "none"; };
     $("#delC")?.addEventListener("click", async () => { const n = CAT.prods.filter(p => p.cat === c.id).length; if (n) return toast(`Tiene ${n} plato(s). Muévelos a otra categoría primero.`, true); if (!confirm(`¿Eliminar «${c.nombre}»?`)) return; await DB.del("categorias", c.id); cerrarModal(); VIEWS.categorias(); }); } });
   $("#nc").addEventListener("click", () => form());
   $("#view").onclick = async e => { const ec = e.target.closest("[data-ec]"), up = e.target.closest("[data-up]"), dn = e.target.closest("[data-dn]");
@@ -414,6 +435,7 @@ VIEWS.ajustes = async () => {
     if (!x.dias.length) return toast("Marca al menos un día de atención", true);
     if (JSON.stringify(x).length > 950000) return toast("Las imágenes pesan demasiado. Usa fotos más livianas.", true);
     await DB.set("ajustes", "general", x); Object.assign(CAT.aj, x); marcaPanel(); pintarAbierto(); toast("Ajustes guardados · ya se ven en la web"); });
+  $("#fotosEj")?.addEventListener("click", ponerFotosEjemplo);
   $("#seed")?.addEventListener("click", async () => {
     if (!confirm(DEMO ? "En modo demo esto reinicia TODOS los datos de prueba. ¿Continuar?" : "Se crearán las categorías, platos y zonas de ejemplo. ¿Continuar?")) return;
     if (DEMO) { localStorage.removeItem("pl_db"); LDB.get(); toast("Datos demo reiniciados"); await cargarCatalogo(); return go("inicio"); }

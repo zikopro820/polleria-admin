@@ -89,7 +89,8 @@ let CAT = { aj: {}, cats: [], prods: [], zonas: [] };
 async function cargarCatalogo() {
   const [aj, cats, prods] = await Promise.all([DB.get("ajustes", "general"), DB.list("categorias"), DB.list("productos")]);
   const zonas = await DB.list("zonas"); CAT.zonas = zonas.sort((a, b) => (a.orden ?? 99) - (b.orden ?? 99));
-  CAT = { zonas: CAT.zonas, aj: { ...window.PL_AJUSTES, ...(aj || {}) }, cats: cats.sort((a, b) => (a.orden ?? 99) - (b.orden ?? 99)), prods: prods.sort((a, b) => (a.orden ?? 999) - (b.orden ?? 999) || String(a.nombre).localeCompare(b.nombre)) };
+  CAT = { zonas: CAT.zonas, aj: { ...window.PL_AJUSTES, ...(aj || {}) }, cats: cats.map(c => c.foto || !window.PL_FOTOS.categorias[c.id] ? c : { ...c, foto: window.PL_FOTO(window.PL_FOTOS.categorias[c.id], 300) }).sort((a, b) => (a.orden ?? 99) - (b.orden ?? 99)),
+    prods: prods.map(p => p.foto || !window.PL_FOTOS.productos[p.id] ? p : { ...p, foto: window.PL_FOTO(window.PL_FOTOS.productos[p.id]) }).sort((a, b) => (a.orden ?? 999) - (b.orden ?? 999) || String(a.nombre).localeCompare(b.nombre)) };
   return CAT;
 }
 const catDe = id => CAT.cats.find(c => c.id === id) || {};

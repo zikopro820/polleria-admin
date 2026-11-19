@@ -18,11 +18,28 @@ window.PL_AJUSTES = {
   redes: { facebook: "", instagram: "", tiktok: "" }
 };
 
+/* ---------- Fotos reales de ejemplo (Wikimedia Commons, licencias libres CC BY / CC BY-SA) ----------
+   Se ven al instante. Cuando tengas tus propias fotos, súbelas desde el panel (Carta y precios). */
+window.PL_FOTO = (f, w = 640) => "https://commons.wikimedia.org/wiki/Special:FilePath/" + encodeURIComponent(f) + "?width=" + w;
+window.PL_FOTOS = {
+  productos: {
+    "p-14": "Un_cuarto_de_Pollo_a_la_Brasa.JPG", "p-12": "Pollo_a_la_brasa_pierna_con_papas.JPG", "p-1": "Pollo_a_la_brasa_peruano.jpg",
+    "c-fam": "Pollo_a_la_brasa_para_llevar.JPG", "c-duo": "Pollo_a_la_brasa_Lima_Peru.jpg", "c-parri": "Parrillada.jpg",
+    "pa-bife": "Bife_de_chorizo_a_punto_02.jpg", "pa-mix": "Parrilla_Mixta.JPG", "pa-anti": "Anticucho_del_Perú.JPG", "pa-chuleta": "Lomo_de_cerdo_a_la_brasa.jpg",
+    "b-broaster": "Fried-Chicken-Set.jpg", "b-alitas": "BBQ_chicken_wing.jpg",
+    "g-papas": "Papas_fritas_(plato).jpg", "g-chaufa": "Arroz_chaufa.JPG", "g-ensalada": "Ensalada-mixta-lechuga-huevo-tomates-cebolla-maiz-remolacha-restaurante-chipiona.JPG", "g-platano": "Platano_frito.JPG",
+    "be-inca": "IncaKolaBottleGlass.jpg", "be-coca": "Coca-Cola_Bottle.jpeg", "be-chicha": "Chicha_Morada_2017.jpg", "be-limonada": "Glass_of_lemonade.jpg", "be-agua": "Glass_of_cold_mineral_water.jpg",
+    "po-mazamorra": "Mazamorra_morada.JPG", "po-arroz": "Arroz_con_leche_estilo_peruano.jpg", "po-combinado": "Vasos_de_mazamorra_morada_y_arroz_con_leche.jpg"
+  },
+  categorias: { pollos: "Pollo_a_la_brasa_peruano.jpg", combos: "Pollo_a_la_brasa_para_llevar.JPG", parrillas: "Parrillada.jpg", broaster: "Fried-Chicken-Set.jpg",
+    guarniciones: "Papas_fritas_(plato).jpg", bebidas: "IncaKolaBottleGlass.jpg", postres: "Vasos_de_mazamorra_morada_y_arroz_con_leche.jpg" }
+};
+
 window.PL_SEMILLA = function () {
   const db = { ajustes: { general: JSON.parse(JSON.stringify(window.PL_AJUSTES)) }, categorias: {}, productos: {}, zonas: {}, pedidos: {}, capturas: {}, movimientos: {}, clientes: {} };
   const C = [["pollos", "Pollos a la brasa", "🍗"], ["combos", "Combos familiares", "🎉"], ["parrillas", "Parrillas", "🥩"], ["broaster", "Broaster y alitas", "🍖"],
     ["guarniciones", "Guarniciones", "🍟"], ["bebidas", "Bebidas", "🥤"], ["postres", "Postres", "🍮"]];
-  C.forEach(([id, nombre, icono], i) => db.categorias[id] = { nombre, icono, orden: i });
+  C.forEach(([id, nombre, icono], i) => db.categorias[id] = { nombre, icono, orden: i, foto: window.PL_FOTO(window.PL_FOTOS.categorias[id], 300) });
   // Opciones reutilizables
   const parte = { id: "parte", titulo: "Parte del pollo", tipo: "uno", req: true, items: [{ n: "Pierna" }, { n: "Pecho" }, { n: "Ala" }] };
   const papas = { id: "papas", titulo: "Acompañamiento", tipo: "uno", req: true, items: [{ n: "Papas fritas" }, { n: "Papas al hilo" }, { n: "Mitad papas, mitad ensalada" }, { n: "Cambiar por chaufa", p: 3 }] };
@@ -57,7 +74,7 @@ window.PL_SEMILLA = function () {
     ["po-combinado", "Clásico combinado", "postres", 8, "Mazamorra + arroz con leche.", [], 0]
   ];
   P.forEach(([id, nombre, cat, precio, desc, opciones, destacado], i) => {
-    db.productos[id] = { nombre, cat, precio, desc, opciones, destacado: !!destacado, activo: true, agotado: false, foto: "", orden: i,
+    db.productos[id] = { nombre, cat, precio, desc, opciones, destacado: !!destacado, activo: true, agotado: false, foto: window.PL_FOTOS.productos[id] ? window.PL_FOTO(window.PL_FOTOS.productos[id]) : "", orden: i,
       sugerirBebida: !["bebidas", "postres"].includes(cat), cremas: ["pollos", "combos", "parrillas", "broaster"].includes(cat) };
   });
   [["z1", "Cercado (hasta 2 km)", 5], ["z2", "Zona 2 (2 a 4 km)", 8], ["z3", "Zona 3 (4 a 6 km)", 12]].forEach(([id, nombre, costo], i) => db.zonas[id] = { nombre, costo, activo: true, orden: i });
